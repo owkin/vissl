@@ -95,12 +95,17 @@ class ResNeXt(nn.Module):
             layers=(n1, n2, n3, n4),
             zero_init_residual=self.zero_init_residual,
             groups=self.groups,
-            width_per_group=self.width_per_group,
+            # width_per_group=self.width_per_group,
+            width_per_group=self.width_per_group * self.width_multiplier,  # DEBUG:
             norm_layer=self._norm_layer,
         )
 
-        model.inplanes = 64 * self.width_multiplier
-        dim_inner = 64 * self.width_multiplier
+        # DEBUG:
+        model.inplanes = 64
+        dim_inner = 64
+
+        # model.inplanes = 64 * self.width_multiplier
+        # dim_inner = 64 * self.width_multiplier
         # some tasks like Colorization https://arxiv.org/abs/1603.08511 take input
         # as L channel of an LAB image. In that case we change the input channel
         # and re-construct the conv1
