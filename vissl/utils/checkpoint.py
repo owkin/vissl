@@ -188,6 +188,11 @@ class CheckpointLoader:
         Load the checkpoint at the provided path, dealing with the
         potential indirection due to the notion of sharded checkpoint
         """
+        # CHARLIE DEBUG : Avoid OSError: [Errno 28] No space left on device because /tmp is quite small on node (150mb), see jz-doc dicussion
+        import tempfile
+        import os
+        tempfile.tempdir = os.environ.get("JOBSCRATCH")
+
         checkpoint = load_and_broadcast_checkpoint(checkpoint_path, device)
         cls._update_version(checkpoint)
         if cls._is_shard_aggregator_checkpoint(checkpoint):
