@@ -28,6 +28,9 @@ from vissl.data.synthetic_dataset import SyntheticImageDataset
 from vissl.data.torchvision_dataset import TorchvisionDataset
 from vissl.utils.misc import set_dataloader_seeds, setup_multiprocessing_method
 
+# CHARLIE 
+from vissl.data.samplers.cond_data_sampler import CondSSLDistributedSampler
+
 
 __all__ = [
     "AirstoreDataset",
@@ -121,6 +124,15 @@ def get_sampler(dataset, dataset_config, sampler_seed=0):
                 batch_size=dataset_config["BATCHSIZE_PER_REPLICA"],
                 seed=sampler_seed,
             )
+        # CHARLIE: add cond SSL sampler
+        elif dataset_config["USE_COND_SSL_DISTRIBUTED_SAMPLER"]:
+            data_sampler = CondSSLDistributedSampler(
+                dataset,
+                batch_size=dataset_config["BATCHSIZE_PER_REPLICA"],
+                n_slides_per_batch=dataset_config["N_SLIDES_PER_BATCH"],
+                seed=sampler_seed,
+            )
+            print("Using Conditional SSL SAMPLER !!")
         else:
             data_sampler = torch.utils.data.distributed.DistributedSampler(dataset)
         logging.info("Created the Distributed Sampler....")
