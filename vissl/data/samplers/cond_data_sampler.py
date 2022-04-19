@@ -94,16 +94,28 @@ class CondSSLDistributedSampler(Sampler[T_co]):
 
         # CHARLIE : get filenames to sort later based on slidename
         self.filenames = self.dataset.get_image_paths()[0]
-        self.filenames = [Path(f).name for f in self.filenames]
-        self.slidenames = [f.split("_")[4].replace(".png", "") for f in self.filenames]
+        self.filenames = [Path(f) for f in self.filenames]
+        # self.slidenames = [f.split("_")[4].replace(".png", "") for f in self.filenames]
+        # CHARLIE : for Imagenet only
+        self.slidenames = [Path(f).parents[0].name for f in self.filenames]
         self.batch_size = batch_size
+        assert batch_size % n_slides_per_batch == 0
         self.n_slides_per_batch = n_slides_per_batch
         self.n_tiles_per_slide = batch_size // n_slides_per_batch
 
         # CHARLIE : number of samples is less than the size of the dataset
         # This assumes that every slides has at least n_tiles_per_slide tiles
-        real_len_dataset = len(self.slidenames) * self.n_tiles_per_slide
-        self.num_samples = real_len_dataset / self.num_replicas
+        self.real_len_dataset = len(set(self.slidenames)) * self.n_tiles_per_slide
+        if self.drop_last and len(self.dataset) % self.num_replicas != 0:  # type: ignore[arg-type]
+            # Split to nearest available length that is evenly divisible.
+            # This is to ensure each rank receives the same amount of data when
+            # using this Sampler.
+            self.num_samples = math.ceil(
+                    (self.real_len_dataset - self.num_replicas) / self.num_replicas  # type: ignore[arg-type]
+                    )
+        else:
+            self.num_samples = math.ceil(self.real_len_dataset / self.num_replicas)  # type: ignore[arg-type]
+        # self.num_samples = math.ceil(real_len_dataset / self.num_replicas)
 
         self.total_size = self.num_samples * self.num_replicas
         self.shuffle = shuffle
@@ -129,7 +141,7 @@ class CondSSLDistributedSampler(Sampler[T_co]):
             indices = torch.tensor(df.index.values)
 
             df = df.groupby("slidename").sample(n=self.n_tiles_per_slide)
-            indices = torch.tensor(df.index.values)
+            indices = df.index.tolist()
 
         else:
             raise NotImplementedError
@@ -144,7 +156,7 @@ class CondSSLDistributedSampler(Sampler[T_co]):
         else:
             # remove tail of data to make it evenly divisible.
             indices = indices[: self.total_size]
-        assert len(indices) == self.total_size
+        assert len(indices) == self.total_size, f"{len(indices)}, {self.total_size}"
 
         # subsample
         indices = indices[self.rank:self.total_size:self.num_replicas]
