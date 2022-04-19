@@ -93,7 +93,8 @@ class CondSSLDistributedSampler(Sampler[T_co]):
         self.drop_last = drop_last
 
         # CHARLIE : get filenames to sort later based on slidename
-        self.filenames = [Path(f).name for f in self.dataset.data_paths]
+        self.filenames = self.dataset.get_image_paths()[0]
+        self.filenames = [Path(f).name for f in self.filenames]
         self.slidenames = [f.split("_")[4].replace(".png", "") for f in self.filenames]
         self.batch_size = batch_size
         self.n_slides_per_batch = n_slides_per_batch
