@@ -122,8 +122,6 @@ class CondSSLDistributedSampler(Sampler[T_co]):
         self.seed = seed
 
     def __iter__(self) -> Iterator[T_co]:
-        # sort filenames
-        # indices = sort_filenames_by_slidename(filenames=self.filenames)
 
         if self.shuffle:
             # deterministically shuffle based on epoch and seed
@@ -138,9 +136,6 @@ class CondSSLDistributedSampler(Sampler[T_co]):
             )
             df = df.sample(frac=1, random_state=self.seed + self.epoch)
             df = df.groupby("slidename").sample(self.n_tiles_per_slide, random_state=self.seed + self.epoch)
-            indices = torch.tensor(df.index.values)
-
-            df = df.groupby("slidename").sample(n=self.n_tiles_per_slide)
             indices = df.index.tolist()
 
         else:
