@@ -2,6 +2,7 @@
 # A provisoire to implement https://github.com/NYUMedML/conditional_ssl_hist
 
 from typing import List
+import numpy as np
 import pandas as pd
 from pathlib import Path
 import math
@@ -88,7 +89,7 @@ class CondSSLDistributedSampler(Sampler[T_co]):
             )
         self.dataset = dataset
         self.num_replicas = num_replicas
-        self.rank = rank
+        self.rank = rank  # CHARLIE : must be global rank, i.e. from 0 to 15 if using 16 gpus in total
         self.epoch = 0
         self.drop_last = drop_last
 
@@ -98,14 +99,24 @@ class CondSSLDistributedSampler(Sampler[T_co]):
         # self.slidenames = [f.split("_")[4].replace(".png", "") for f in self.filenames]
         # CHARLIE : for Imagenet only
         self.slidenames = [Path(f).parents[0].name for f in self.filenames]
-        self.batch_size = batch_size
+        self.batch_size = batch_size  # CHARLIE: this is batchsize per replica ! i.e. if 16 gpus, total batchsize is batchsize * 16
         assert batch_size % n_slides_per_batch == 0
         self.n_slides_per_batch = n_slides_per_batch
-        self.n_tiles_per_slide = batch_size // n_slides_per_batch
+        self.n_tiles_per_slide = (batch_size * num_replicas) // n_slides_per_batch
 
         # CHARLIE : number of samples is less than the size of the dataset
         # This assumes that every slides has at least n_tiles_per_slide tiles
-        self.real_len_dataset = len(set(self.slidenames)) * self.n_tiles_per_slide
+        # very dirty
+        df_samples = pd.DataFrame(
+            {
+                "filename": self.filenames,
+                "slidename": self.slidenames,
+            }
+        )
+        dict_samples = {s: df_samples[df_samples["slidename"] == s] for s in df_samples["slidename"].unique()}
+        min_n_tiles_slide = np.min([len(dict_samples[s]) for s in dict_samples])
+        
+        self.real_len_dataset = (min_n_tiles_slide // self.n_tiles_per_slide) * self.n_tiles_per_slide * len(dict_samples)
         if self.drop_last and len(self.dataset) % self.num_replicas != 0:  # type: ignore[arg-type]
             # Split to nearest available length that is evenly divisible.
             # This is to ensure each rank receives the same amount of data when
@@ -128,15 +139,24 @@ class CondSSLDistributedSampler(Sampler[T_co]):
             # g = torch.Generator()
             # g.manual_seed(self.seed + self.epoch)
             # indices = torch.randperm(len(self.dataset), generator=g).tolist()  # type: ignore[arg-type]
-            df = pd.DataFrame(
+            df_samples = pd.DataFrame(
                 {
                     "filename": self.filenames,
                     "slidename": self.slidenames,
                 }
             )
-            df = df.sample(frac=1, random_state=self.seed + self.epoch)
-            df = df.groupby("slidename").sample(self.n_tiles_per_slide, random_state=self.seed + self.epoch)
-            indices = df.index.tolist()
+            df_samples = df_samples.sample(frac=1, random_state=self.seed + self.epoch)
+            dict_samples = {s: df_samples[df_samples["slidename"] == s] for s in df_samples["slidename"].unique()}
+            min_n_tiles_slide = np.min([len(dict_samples[s]) for s in dict_samples])
+            
+            indices = []
+            for i in range(min_n_tiles_slide // self.n_tiles_per_slide):
+                for s in dict_samples:
+                    indices_ = dict_samples[s].iloc[:self.n_tiles_per_slide].index.tolist()
+                    indices += indices_
+                    # Remove the already sampled indices
+                    mask = ~dict_samples[s].index.isin(indices_)
+                    dict_samples[s] = dict_samples[s][mask]
 
         else:
             raise NotImplementedError
