@@ -96,6 +96,7 @@ class CondSSLDistributedSampler(Sampler[T_co]):
         # CHARLIE : get filenames to sort later based on slidename
         self.filenames = self.dataset.get_image_paths()[0]
         self.filenames = [Path(f) for f in self.filenames]
+        # import ipdb; ipdb.set_trace()
         # self.slidenames = [f.split("_")[4].replace(".png", "") for f in self.filenames]
         # CHARLIE : for Imagenet only
         self.slidenames = [Path(f).parents[0].name for f in self.filenames]
@@ -149,14 +150,18 @@ class CondSSLDistributedSampler(Sampler[T_co]):
             dict_samples = {s: df_samples[df_samples["slidename"] == s] for s in df_samples["slidename"].unique()}
             min_n_tiles_slide = np.min([len(dict_samples[s]) for s in dict_samples])
             
-            indices = []
-            for i in range(min_n_tiles_slide // self.n_tiles_per_slide):
-                for s in dict_samples:
-                    indices_ = dict_samples[s].iloc[:self.n_tiles_per_slide].index.tolist()
-                    indices += indices_
-                    # Remove the already sampled indices
-                    mask = ~dict_samples[s].index.isin(indices_)
-                    dict_samples[s] = dict_samples[s][mask]
+	    # New way to get indices  to decomment
+	    indices = []
+	    while len(dict_samples):
+    	    slidenames = list(dict_samples.keys())
+            for s in slidenames:
+                indices_ = dict_samples[s].iloc[:n_tiles_per_slide].index.tolist()
+                indices += indices_
+                mask = ~dict_samples[s].index.isin(indices_)
+            if len(dict_samples[s][mask]) < n_tiles_per_slide:
+               dict_samples.pop(s)
+            else:
+               dict_samples[s] = dict_samples[s][mask]
 
         else:
             raise NotImplementedError
