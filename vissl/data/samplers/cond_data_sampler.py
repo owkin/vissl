@@ -115,9 +115,8 @@ class CondSSLDistributedSampler(Sampler[T_co]):
             }
         )
         dict_samples = {s: df_samples[df_samples["slidename"] == s] for s in df_samples["slidename"].unique()}
-        min_n_tiles_slide = np.min([len(dict_samples[s]) for s in dict_samples])
-        
-        self.real_len_dataset = (min_n_tiles_slide // self.n_tiles_per_slide) * self.n_tiles_per_slide * len(dict_samples)
+       
+        self.real_len_dataset = sum([(len(dict_samples[s]) // self.n_tiles_per_slide) * self.n_tiles_per_slide for s in dict_samples])
         if self.drop_last and len(self.dataset) % self.num_replicas != 0:  # type: ignore[arg-type]
             # Split to nearest available length that is evenly divisible.
             # This is to ensure each rank receives the same amount of data when
@@ -148,21 +147,22 @@ class CondSSLDistributedSampler(Sampler[T_co]):
             )
             df_samples = df_samples.sample(frac=1, random_state=self.seed + self.epoch)
             dict_samples = {s: df_samples[df_samples["slidename"] == s] for s in df_samples["slidename"].unique()}
-            min_n_tiles_slide = np.min([len(dict_samples[s]) for s in dict_samples])
-            
 	    # New way to get indices  to decomment
-	    indices = []
-	    while len(dict_samples):
-    	    slidenames = list(dict_samples.keys())
-            for s in slidenames:
-                indices_ = dict_samples[s].iloc[:n_tiles_per_slide].index.tolist()
-                indices += indices_
-                mask = ~dict_samples[s].index.isin(indices_)
-            if len(dict_samples[s][mask]) < n_tiles_per_slide:
-               dict_samples.pop(s)
-            else:
-               dict_samples[s] = dict_samples[s][mask]
-
+            indices = []
+            # Until there is no more slide in dict_samples ...
+            while len(dict_samples):
+                slidenames = list(dict_samples.keys())
+                for s in slidenames:        
+                    indices_ = dict_samples[s].iloc[:self.n_tiles_per_slide].index.tolist()
+                    # There is enough tile left to sample
+                    if len(indices_) == self.n_tiles_per_slide:
+                        indices += indices_
+                        mask = ~dict_samples[s].index.isin(indices_)
+                        dict_samples[s] = dict_samples[s][mask]
+                    # There is not enough tile : we remove the slide
+                    else:
+                        # print(f"{s} : Not enough tiles; removing")
+                        dict_samples.pop(s)
         else:
             raise NotImplementedError
 
