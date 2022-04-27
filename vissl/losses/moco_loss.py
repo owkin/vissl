@@ -47,6 +47,8 @@ class MoCoLoss(ClassyLoss):
     def __init__(self, config: MoCoLossConfig):
         super().__init__()
         self.loss_config = config
+        if self.loss_config.condition:
+            print("DEBUG CHARLIE : CONDITIONAL SSL !!")
 
         # Create the queue
         self.register_buffer(
@@ -125,6 +127,14 @@ class MoCoLoss(ClassyLoss):
         # --
         # Normalize the encoder raw outputs
         query = nn.functional.normalize(query, dim=1)
+
+        # --
+        # Conditional SSL : no queue ! 
+        # See https://github.com/NYUMedML/conditional_ssl_hist/blob/49b363f962abea89b074656bcd2b12cecc441d85/condssl/builder.py#L144-L170
+        if self.loss_config.condition:
+            logits = torch.mm(query, self.key.T) / self.loss_config.temperature
+            labels = torch.arange(logits.shape[0], dtype=torch.long).to(query.device)
+            return self.criterion(logits, labels)
 
         # --
         # Compute all the logits and the expected labels
