@@ -455,7 +455,13 @@ class SelfSupervisionTask(ClassificationTask):
         logging.info("Building model....")
 
         # Instantiate the raw model as specified
-        model = build_model(self.config["MODEL"], self.config["OPTIMIZER"])
+        if self.config["MODEL"]["TRUNK"]["NAME"] == "efficientnet":
+            print("CHARLIE: adding back some model params to the config to avoid bug")
+            buffer_conf = self.config["MODEL"]["TRUNK"]["EFFICIENT_NETS"].copy()  # CHARLIE: UGLY HACK TO DEBUG model_version of EFFICIENT_NET missing
+            model = build_model(self.config["MODEL"], self.config["OPTIMIZER"])  # CHARLIE: PROBLEM Here: some needed keys of the config are deleted by this operation
+            for k in buffer_conf:  # CHARLIE: UGLY HACK TO DEBUG model_version of EFFICIENT_NET missing
+                if k not in self.config["MODEL"]["TRUNK"]["EFFICIENT_NETS"]:
+                    self.config["MODEL"]["TRUNK"]["EFFICIENT_NETS"][k] = buffer_conf[k]
 
         # Convert the BatchNorm layers to SyncBatchNorm if needed
         # Both Apex and Pytorch SyncBatchNorms are GPU only
