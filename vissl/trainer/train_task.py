@@ -531,6 +531,7 @@ class SelfSupervisionTask(ClassificationTask):
         """
         start_iter = 0
         if compute_start_iter:
+            logging.info(f"CHARLIE DEBUG : entering _compute_start_iter_from_checkpoint()")
             start_iter = self._compute_start_iter_from_checkpoint(phase_type)
 
         self.set_epoch(phase_type, epoch, start_iter, train_phase_idx)
@@ -542,6 +543,7 @@ class SelfSupervisionTask(ClassificationTask):
         # For OSS, this will always return false.
         # Otherwise, we will rebuild the dataloader after every phase.
         if dataset.rebuild_dataloader():
+            logging.info(f"CHARLIE DEBUG : entering build_dataloader()")
             dataloader = build_dataloader(
                 dataset=dataset,
                 dataset_config=self.config.DATA[phase_type.upper()],
@@ -561,7 +563,10 @@ class SelfSupervisionTask(ClassificationTask):
         # delete old dataiterator and reset it.
         del self.data_iterator
         gc.collect()
+        logging.info(f"CHARLIE DEBUG : will iter dataloader")
+        logging.info(f"CHARLIE DEBUG : {len(self.dataloaders[phase_type])}")
         self.data_iterator = iter(self.dataloaders[phase_type])
+        logging.info(f"CHARLIE DEBUG : iter is done")
 
     def _set_classy_state(self, state):
         """
@@ -750,6 +755,13 @@ class SelfSupervisionTask(ClassificationTask):
         self.dataloaders = self.build_dataloaders(
             pin_memory=pin_memory, current_train_phase_idx=current_train_phase_idx
         )
+        
+        # CHARLIE DEBUG DUMP IMAGES
+        # for k in self.dataloaders:
+        #    import uuid
+        #    x = next(iter(self.dataloaders[k]))
+        #    torch.save(x, f"/gpfsscratch/rech/htc/uxu85mw/mocov2_batch_images/batch_moco_{uuid.uuid4().hex}.pkl")
+        #    print("moco batch saved")
 
         # Build base loss, move to device, and load from checkpoint if applicable
         self.base_loss = self._build_loss()
