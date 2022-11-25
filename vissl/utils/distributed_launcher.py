@@ -263,7 +263,7 @@ def launch_distributed_on_slurm(cfg: AttrDict, engine_name: str):
         cpus_per_task=cfg.SLURM.NUM_CPU_PER_PROC * cfg.DISTRIBUTED.NUM_PROC_PER_NODE,
         tasks_per_node=1,
         gpus_per_node=cfg.DISTRIBUTED.NUM_PROC_PER_NODE,
-        mem_gb=cfg.SLURM.MEM_GB,
+        # mem_gb=cfg.SLURM.MEM_GB, # CHARLIE: comment because JZ does not like it http://www.idris.fr/eng/jean-zay/gpu/jean-zay-gpu-exec_alloc-mem-eng.html)
         slurm_additional_parameters=cfg.SLURM.ADDITIONAL_PARAMETERS,
     )
     trainer = _ResumableSlurmJob(engine_name=engine_name, config=cfg)
