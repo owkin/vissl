@@ -96,7 +96,7 @@ class ResNeXt(nn.Module):
             zero_init_residual=self.zero_init_residual,
             groups=self.groups,
             # width_per_group=self.width_per_group,
-            width_per_group=self.width_per_group * self.width_multiplier,  # DEBUG:
+            width_per_group=self.width_per_group * self.width_multiplier,  # DEBUG: CHARLIE
             norm_layer=self._norm_layer,
         )
 
